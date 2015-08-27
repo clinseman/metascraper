@@ -16,7 +16,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.3.9",
   "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
   "commons-validator" % "commons-validator" % "1.4.1",
-  "org.jsoup" % "jsoup" % "1.8.1"
+  "org.jsoup" % "jsoup" % "1.8.1",
+  "com.typesafe.play" % "play-ws_2.11" % "2.4.2"
 )
 
 publishTo <<= version { v: String =>

@@ -2,9 +2,11 @@ package com.beachape.metascraper
 
 import com.beachape.metascraper.Messages._
 import akka.actor.{ ActorLogging, ActorRef, Actor, Props }
+import com.google.inject.Inject
 import dispatch._
 import java.util.concurrent.Executors
 import com.ning.http.client.{ AsyncHttpClientConfig, AsyncHttpClient }
+import play.api.libs.ws.WSClient
 
 import scala.util.{ Failure, Success }
 
@@ -40,7 +42,7 @@ object ScraperActor {
  * Should be instantiated with Props provided via companion object factory
  * method
  */
-class ScraperActor(
+class ScraperActor(wsClient: WSClient)(
   httpExecutorThreads: Int = 10,
   maxConnectionsPerHost: Int = 30,
   connectionTimeoutInMs: Int = 10000,
@@ -57,23 +59,11 @@ class ScraperActor(
   val compressionEnabled = true
 
   private val executorService = Executors.newFixedThreadPool(httpExecutorThreads)
-  private val config = new AsyncHttpClientConfig.Builder()
-    .setExecutorService(executorService)
-    .setIOThreadMultiplier(1) // otherwise we might not have enough threads
-    .setMaximumConnectionsPerHost(maxConnectionsPerHost)
-    .setAllowPoolingConnection(connectionPooling)
-    .setAllowSslConnectionPool(connectionPooling)
-    .setConnectionTimeoutInMs(connectionTimeoutInMs)
-    .setRequestTimeoutInMs(requestTimeoutInMs)
-    .setCompressionEnabled(compressionEnabled)
-    .setFollowRedirects(followRedirects).build
-  private val asyncHttpClient = new AsyncHttpClient(config)
-  private val httpClient = new Http(asyncHttpClient)
 
-  private val scraper = new Scraper(httpClient, validSchemas)
+  private val scraper = new Scraper(wsClient, validSchemas)
 
   override def postStop() {
-    httpClient.shutdown()
+    wsClient.close()
     executorService.shutdown()
   }
 

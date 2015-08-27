@@ -6,6 +6,7 @@ import com.ning.http.client.Response
 import dispatch._
 import org.apache.commons.validator.routines.UrlValidator
 import StringOps._
+import play.api.libs.ws.{ WS, WSResponse, WSClient }
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util._
@@ -13,7 +14,7 @@ import scala.util._
 /**
  * Created by Lloyd on 2/15/15.
  */
-class Scraper(httpClient: Http, urlSchemas: Seq[String])(implicit ec: ExecutionContext) {
+class Scraper(wsClient: WSClient, urlSchemas: Seq[String])(implicit ec: ExecutionContext) {
 
   private val urlValidator = new UrlValidator(urlSchemas.toArray)
 
@@ -33,11 +34,10 @@ class Scraper(httpClient: Http, urlSchemas: Seq[String])(implicit ec: ExecutionC
     else if (messageUrl.hasImageExtension) {
       Future.successful(ScrapedData(messageUrl, messageUrl, messageUrl, messageUrl, Seq(messageUrl)))
     } else {
-      val requestHeaders = Map(
-        "User-Agent" -> Seq(message.userAgent),
-        "Accept-Language" -> Seq(message.acceptLanguageCode))
-      val request = url(messageUrl).setHeaders(requestHeaders)
-      val resp = httpClient(request)
+      val resp = wsClient.url(messageUrl).withHeaders(
+        "User-Agent" -> message.userAgent,
+        "Accept-Language" -> message.acceptLanguageCode
+      ).get
       resp map (s => extractData(s, messageUrl, message.schemaFactories, message.numberOfImages))
     }
   }
@@ -48,9 +48,9 @@ class Scraper(httpClient: Http, urlSchemas: Seq[String])(implicit ec: ExecutionC
    * The list of [[Schema]] are processed from left to right, meaning the ones to the beginning of the
    * list get precedence over those towards the end
    */
-  def extractData(resp: Response, url: String, schemaFactories: Seq[SchemaFactory], numberOfImages: Int): ScrapedData = {
-    if (resp.getStatusCode / 100 == 2) {
-      val schemas = schemaFactories.toStream.flatMap(f => Try(f.apply(resp)).getOrElse(Nil)) // Stream in case we have expensive factories
+  def extractData(resp: WSResponse, url: String, schemaFactories: Seq[SchemaFactory], numberOfImages: Int): ScrapedData = {
+    if (resp.status / 100 == 2) {
+      val schemas = schemaFactories.toStream.flatMap(f => Try(f.apply(resp, url)).getOrElse(Nil)) // Stream in case we have expensive factories
       val maybeUrl = schemas.flatMap(s => Try(s.extractUrl).toOption).find(_.isDefined).getOrElse(None)
       val maybeTitle = schemas.flatMap(s => Try(s.extractTitle).toOption).find(_.isDefined).getOrElse(None)
       val maybeDescription = schemas.flatMap(s => Try(s.extractDescription).toOption).find(_.isDefined).getOrElse(None)
@@ -64,7 +64,7 @@ class Scraper(httpClient: Http, urlSchemas: Seq[String])(implicit ec: ExecutionC
         mainImageUrl = maybeMainImg.getOrElse("")
       )
     } else {
-      throw StatusCode(resp.getStatusCode)
+      throw StatusCode(resp.status)
     }
   }
 

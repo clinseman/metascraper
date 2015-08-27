@@ -5,6 +5,7 @@ import com.ning.http.client.Response
 import dispatch.as.String
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import play.api.libs.ws.WSResponse
 
 /**
  * Created by Lloyd on 2/15/15.
@@ -26,8 +27,8 @@ trait HtmlSchema extends Schema {
 
 case class HtmlSchemas(schemas: (Document => HtmlSchema)*) extends SchemaFactory {
 
-  def apply(resp: Response): Seq[HtmlSchema] = {
-    val doc = Jsoup.parse(String(resp), resp.getUri.toString)
+  def apply(resp: WSResponse, uri: String): Seq[HtmlSchema] = {
+    val doc = Jsoup.parse(resp.body, uri)
     schemas.map(_.apply(doc))
   }
 
